@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Box, TextField, Paper, Toolbar, AppBar, FormControl, MenuItem, InputLabel, Select, Typography, Button, Alert, Stack } from '@mui/material';
+import { Box, TextField, LinearProgress ,
+    Paper, Toolbar, AppBar, FormControl, MenuItem, InputLabel, Select, Typography, Button, Alert, Stack } from '@mui/material';
 import OpenAIServices from '../servcies/OpenAIServices';
 
 const QueryForm = () => {
@@ -7,16 +8,21 @@ const QueryForm = () => {
     const[selectedTable, setSelectedTable] = React.useState('');
     const[userRequirement, setUserRequirement] = React.useState('');
     const[userRequiredResult, setUserRequiredResult] = React.useState('');
+    const[executingResults, setExecutingResults] = React.useState(false);
 
     useEffect(() => {
-        GenAIServices.fetchAllTables().then((response) => {
-            setTables(response.data);
+        OpenAIServices.fetchAllTables().then((response) => {
+            console.log(response);
+            setTables([]);
+            response.map((table) => {
+                setTables((tableVar) => [...tableVar, table.name]);
+            });
         }).catch((error) => {
             <Stack sx={{ width: '100%' }} spacing={2}>
                 <Alert variant="filled" severity="error">Unable to fetch tables </Alert>
             </Stack>
         })
-    });
+    },[]);
 
     const onChangeOfSelectedTable = (event) => {
         setSelectedTable(event.target.value);
@@ -27,15 +33,20 @@ const QueryForm = () => {
     }
 
     const handleGenerateResult = () => {
+        setExecutingResults(true);
+        setUserRequiredResult('Please wait while we are generating the results ...');
         const payload = {
-            "table": selectedTable,
-            "userRequirement": userRequirement
+            "table_name": selectedTable,
+            "natural_language_query": userRequirement
         }
-        GenAIServices.generateResultCall(payload).then((response) => {
-            setUserRequiredResult(response.data.sql_query);
+        OpenAIServices.generateResultCall(payload).then((response) => {
+            setUserRequiredResult(formatSQLQuery(response.sql_query));
+            setExecutingResults(false);
         }).catch((error) => {
+            setExecutingResults(false);
+            setUserRequiredResult('');
             <Stack sx={{ width: '100%' }} spacing={2}>
-                <Alert variant="fillerd" severity="error">Unable to invoke generate result request </Alert>
+                <Alert variant="filled" severity="error">Unable to invoke generate result request </Alert>
             </Stack>
         })
     }
@@ -52,6 +63,19 @@ const QueryForm = () => {
                 </MenuItem>
             )
         })
+    }
+
+    const formatSQLQuery = (sqlQuery) => { 
+        if(sqlQuery === '' || sqlQuery === null || sqlQuery === undefined){
+            console.log('sqlQuery is empty/null/undefined');
+        }
+        else{
+            let formattedSQLQuery = '';
+            formattedSQLQuery = sqlQuery.replaceAll("```", "").substring(3, sqlQuery.length);
+            console.log("Before format"+sqlQuery);
+            console.log("After format"+formattedSQLQuery);
+            return formattedSQLQuery;
+        }
     }
 
     return (
@@ -77,7 +101,7 @@ const QueryForm = () => {
                         {renderAvailableTables()}
                     </Select>
                  </FormControl>
-                 <Box sx={{m:2, marginLeft: '38%'}}
+                 <Box sx={{m:2, marginLeft: '28%'}}
                     component="form"
                     noValidate
                     autoComplete="on"
@@ -87,15 +111,16 @@ const QueryForm = () => {
                             label="Please provide your requirement"
                             multiline
                             maxRows={4}
-                            sx={{width: '45%'}}
+                            sx={{width: '65%'}}
                             onChange={onChangeOfUserRequirement}
                         />
                  </Box>
                  <Button variant="contained" disableElevation disabled={checkRequiredFields()} 
                  sx={{m:2, marginLeft: '38%', width: '27%'}}
                  onClick={handleGenerateResult}>
-                    Generate Result
+                    {executingResults ? 'Generating Results ...' : 'Generate Results'}
                  </Button>
+                {executingResults && <LinearProgress sx={{marginTop: '0px', marginLeft: '38%', width: '27%'}}/>}
                     <Box sx={{m:2, height: '400px'}}>
                         <TextField
                             id="outlined-multiline-flexible-user-requirement-result"
