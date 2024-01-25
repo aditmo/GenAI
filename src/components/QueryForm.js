@@ -1,71 +1,118 @@
-// src/components/QueryForm.js
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useEffect } from 'react';
+import { Box, TextField, Paper, Toolbar, AppBar, FormControl, MenuItem, InputLabel, Select, Typography, Button, Alert, Stack } from '@mui/material';
+import OpenAIServices from '../servcies/OpenAIServices';
 
 const QueryForm = () => {
-  const [table, setTable] = useState('');
-  const [naturalLanguageQuery, setNaturalLanguageQuery] = useState('');
-  const [sqlQuery, setSqlQuery] = useState('');
-  const [tableOptions, setTableOptions] = useState([]);
+    const[tables, setTables] = React.useState([]);
+    const[selectedTable, setSelectedTable] = React.useState('');
+    const[userRequirement, setUserRequirement] = React.useState('');
+    const[userRequiredResult, setUserRequiredResult] = React.useState('');
 
-  useEffect(() => {
-    const fetchTableOptions = async () => {
-      try {
-        const response = await axios.get('http://localhost:8000/api/tables/');
-        console.log('API Response:', response.data);
-        setTableOptions(response.data);
-      } catch (error) {
-        console.error('Error fetching table options:', error);
-      }
-    };
+    useEffect(() => {
+        GenAIServices.fetchAllTables().then((response) => {
+            setTables(response.data);
+        }).catch((error) => {
+            <Stack sx={{ width: '100%' }} spacing={2}>
+                <Alert variant="filled" severity="error">Unable to fetch tables </Alert>
+            </Stack>
+        })
+    });
 
-    fetchTableOptions();
-  }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await axios.post('http://localhost:8000/api/generate_sql_query/', {
-        table_name: table,
-        natural_language_query: naturalLanguageQuery,
-      });
-
-      setSqlQuery(response.data.sql_query);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    const onChangeOfSelectedTable = (event) => {
+        setSelectedTable(event.target.value);
     }
-  };
 
-  return (
-    <div>
-      <h2>Query Form</h2>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Table:
-          <select value={table} onChange={(e) => setTable(e.target.value)}>
-            <option value="" disabled>Select a table</option>
-            {tableOptions.map((option) => (
-              <option key={option.id} value={option.name}>{option.name}</option>
-            ))}
-          </select>
-        </label>
-        <br />
-        <label>
-          Natural Language Query:
-          <input type="text" value={naturalLanguageQuery} onChange={(e) => setNaturalLanguageQuery(e.target.value)} />
-        </label>
-        <br />
-        <button type="submit" disabled={!table}>Generate SQL Query</button>
-      </form>
-      {sqlQuery && (
-        <div>
-          <h3>Generated SQL Query:</h3>
-          <code>{sqlQuery}</code>
-        </div>
-      )}
-    </div>
-  );
+    const onChangeOfUserRequirement = (event) => {
+        setUserRequirement(event.target.value);
+    }
+
+    const handleGenerateResult = () => {
+        const payload = {
+            "table": selectedTable,
+            "userRequirement": userRequirement
+        }
+        GenAIServices.generateResultCall(payload).then((response) => {
+            setUserRequiredResult(response.data.sql_query);
+        }).catch((error) => {
+            <Stack sx={{ width: '100%' }} spacing={2}>
+                <Alert variant="fillerd" severity="error">Unable to invoke generate result request </Alert>
+            </Stack>
+        })
+    }
+
+    const checkRequiredFields = () => {
+        return selectedTable === '' || userRequirement === '';
+    }
+
+    const renderAvailableTables = () => {
+        return tables.map((table) => {
+            return (
+                <MenuItem value={table}>
+                    {table}
+                </MenuItem>
+            )
+        })
+    }
+
+    return (
+        <Box style={{maxHeight: '800px' , overflow: 'auto', color: '#EAE4E3'}}>
+            <AppBar position="static">
+                <Toolbar>
+                <Typography variant="h4" component="div" sx={{ flexGrow: 1, textAlign: 'center', color: 'white'}}>
+                    Query Generator Bot
+                </Typography>
+                </Toolbar>
+            </AppBar>   
+            <Paper elevation={3} sx={{minHeight: '500px', margin: ' 20px 10px 10px 10px'}}>
+                <FormControl sx={{m:2, marginLeft: '38%',minWidth: '27%'}}>
+                    <InputLabel id="select-table-label=p">Please select the tables</InputLabel>
+                    <Select
+                    labelId="select-table-label"
+                    id="select-table-label"
+                    value={selectedTable}
+                    label="Please select the tables"
+                    onChange={onChangeOfSelectedTable}
+                    autoWidth
+                    >
+                        {renderAvailableTables()}
+                    </Select>
+                 </FormControl>
+                 <Box sx={{m:2, marginLeft: '38%'}}
+                    component="form"
+                    noValidate
+                    autoComplete="on"
+                    >
+                        <TextField
+                            id="outlined-multiline-flexible-user-requirement"
+                            label="Please provide your requirement"
+                            multiline
+                            maxRows={4}
+                            sx={{width: '45%'}}
+                            onChange={onChangeOfUserRequirement}
+                        />
+                 </Box>
+                 <Button variant="contained" disableElevation disabled={checkRequiredFields()} 
+                 sx={{m:2, marginLeft: '38%', width: '27%'}}
+                 onClick={handleGenerateResult}>
+                    Generate Result
+                 </Button>
+                    <Box sx={{m:2, height: '400px'}}>
+                        <TextField
+                            id="outlined-multiline-flexible-user-requirement-result"
+                            label="click on generate result button to see the result"
+                            multiline
+                            fullWidth
+                            rows={10}
+                            InputProps={{
+                                readOnly: true,
+                            }}
+                            sx={{width: '100%', height: '800px'}}
+                            value={userRequiredResult}
+                        />
+                    </Box>
+            </Paper>
+        </Box>
+    );
 };
 
 export default QueryForm;
