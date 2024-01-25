@@ -1,14 +1,17 @@
 import React, { useEffect } from 'react';
-import { Box, TextField, LinearProgress ,
+import { Box, TextField, LinearProgress , Tabs, Tab,
     Paper, Toolbar, AppBar, FormControl, MenuItem, InputLabel, Select, Typography, Button, Alert, Stack } from '@mui/material';
 import OpenAIServices from '../servcies/OpenAIServices';
 
 const QueryForm = () => {
     const[tables, setTables] = React.useState([]);
-    const[selectedTable, setSelectedTable] = React.useState('');
+    const[selectedTable, setSelectedTable] = React.useState([]);
     const[userRequirement, setUserRequirement] = React.useState('');
     const[userRequiredResult, setUserRequiredResult] = React.useState('');
     const[executingResults, setExecutingResults] = React.useState(false);
+    const[currentTabIndex, setCurrentTabIndex] = React.useState(0);
+    const[executedQuery, setExecutedQuery] = React.useState({});
+    
 
     useEffect(() => {
         OpenAIServices.fetchAllTables().then((response) => {
@@ -24,8 +27,37 @@ const QueryForm = () => {
         })
     },[]);
 
+    function ControlTabPanel(props) {
+        const { children, value, index, ...other } = props;
+    
+        return (
+            <div
+                role="tabpanel"
+                hidden={value !== index}
+                id={`control-tabpanel-${index}`}
+                aria-labelledby={`control-tabs-${index}`}
+                {...other}
+            >
+                {value === index && (
+                    <Box sx={{ p: 3 }}>
+                        <Typography>{children}</Typography>
+                    </Box>
+                )}
+            </div>
+        );
+    }
+
+    const handleCurrentTabIndex = (event, newValue) => {
+        setCurrentTabIndex(newValue);
+    }
+
     const onChangeOfSelectedTable = (event) => {
-        setSelectedTable(event.target.value);
+        const {
+            target: { value },
+          } = event;
+          setSelectedTable(
+            typeof value === 'string' ? value.split(',') : value,
+          );
     }
 
     const onChangeOfUserRequirement = (event) => {
@@ -36,12 +68,13 @@ const QueryForm = () => {
         setExecutingResults(true);
         setUserRequiredResult('Please wait while we are generating the results ...');
         const payload = {
-            "table_name": selectedTable,
+            "table_name": selectedTable.join(','),
             "natural_language_query": userRequirement
         }
         OpenAIServices.generateResultCall(payload).then((response) => {
             setUserRequiredResult(formatSQLQuery(response.sql_query));
             setExecutingResults(false);
+            setExecutedQuery(response.executed_query);
         }).catch((error) => {
             setExecutingResults(false);
             setUserRequiredResult('');
@@ -78,6 +111,17 @@ const QueryForm = () => {
         }
     }
 
+    const generateTableFromExecutedQuery = () => {
+        // const table = executedQuery.map((row) => {
+        //     return (
+        //         <TableRow>
+        //             <TableCell>{row}</TableCell>
+        //         </TableRow>
+        //     )
+        // })
+        // return table;    
+    }
+
     return (
         <Box style={{maxHeight: '800px' , overflow: 'auto', color: '#EAE4E3'}}>
             <AppBar position="static">
@@ -97,6 +141,7 @@ const QueryForm = () => {
                     label="Please select the tables"
                     onChange={onChangeOfSelectedTable}
                     autoWidth
+                    multiple
                     >
                         {renderAvailableTables()}
                     </Select>
@@ -121,20 +166,41 @@ const QueryForm = () => {
                     {executingResults ? 'Generating Results ...' : 'Generate Results'}
                  </Button>
                 {executingResults && <LinearProgress sx={{marginTop: '0px', marginLeft: '38%', width: '27%'}}/>}
-                    <Box sx={{m:2, height: '400px'}}>
-                        <TextField
-                            id="outlined-multiline-flexible-user-requirement-result"
-                            label="click on generate result button to see the result"
-                            multiline
-                            fullWidth
-                            rows={10}
-                            InputProps={{
-                                readOnly: true,
-                            }}
-                            sx={{width: '100%', height: '800px'}}
-                            value={userRequiredResult}
-                        />
-                    </Box>
+                <Paper square={true} variant="outlined">
+                    <Stack direction="row" height={"58px"}>
+                        {/* <Typography variant="h6" padding={"10px 25px 0px 25px"} component="div"> Logs </Typography> */}
+                        <Tabs value={currentTabIndex} onChange={handleCurrentTabIndex} aria-label="basic tabs example" sx={{ flexGrow: 1 }}>
+                            <Tab label="Query Generated" />
+                            <Tab label="Results from Query" />
+                            <Tab label="Data Visualization"/>
+                        </Tabs>
+                    </Stack>
+                </Paper>
+                <Paper sx={{ maxHeight: 'calc(100% - 50px)', minHeight: 'calc(100% - 50px)', overflow: 'auto' }}>
+                        <ControlTabPanel value={currentTabIndex} index={0}>
+                            <Box sx={{m:2, height: '400px'}}>
+                                <TextField
+                                    id="outlined-multiline-flexible-user-requirement-result"
+                                    label="click on generate result button to see the result"
+                                    multiline
+                                    fullWidth
+                                    rows={10}
+                                    InputProps={{
+                                        readOnly: true,
+                                    }}
+                                    sx={{width: '100%', height: '800px'}}
+                                    value={userRequiredResult}
+                                />
+                            </Box>
+                        </ControlTabPanel>
+                        <ControlTabPanel value={currentTabIndex} index={1}>
+
+                        </ControlTabPanel>
+                        <ControlTabPanel value={currentTabIndex} index={2}>
+                                <Typography variant='h4'>Currently In Development!!</Typography>
+                        </ControlTabPanel>
+
+                </Paper>
             </Paper>
         </Box>
     );
